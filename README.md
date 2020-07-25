@@ -28,9 +28,9 @@ $ python one_dataset_demo
 FLOW based generative models are usually used to model the latent space density, 
 Block-wise Neural Autoregressive Flow (BNAF) first published by Nicola De CAO: 
  
- https://nicola-decao.github.io/assets/pdf/UAI_poster.pdf 
- https://arxiv.org/abs/1904.04676 
- https://github.com/nicola-decao/BNAF 
+> https://nicola-decao.github.io/assets/pdf/UAI_poster.pdf 
+> https://arxiv.org/abs/1904.04676 
+> https://github.com/nicola-decao/BNAF 
  
  is one of the most powerful among them. A BNAF with only one hidden layer has been proven to be a universal density estimator. Consequently, compare to other models, BNAF requires much fewer layers to achieve the same precision. Furthermore, as an autoregressive flow model, BNAF can be used to boost Explanable AI as described by:
 Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf. 
