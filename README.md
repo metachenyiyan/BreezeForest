@@ -49,7 +49,7 @@ This repository is a snippet of my code developed for this research topic. The c
 
 ### Theorical fundation:
 
-BreezeForest is a bijective function (BF) that map n dimensional continious distribution X~P(X) to n dimensional independant Uniform distribution U~uniform(U):
+BreezeForest is a bijective function (BF) that map n dimensional continious distribution X \~P(X) to n dimensional independant Uniform distribution U \~uniform(U):
 U = BF(X)
 We assume the cumulative density function of P(x) is: 
 
