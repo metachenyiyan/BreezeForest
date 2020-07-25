@@ -1,4 +1,4 @@
-<img src="https://avatars1.githubusercontent.com/u/4284691?v=3&s=200" title="FVCproductions" >
+<img src="https://avatars1.githubusercontent.com/u/4284691?v=3&s=200" title="BreezeForest Structure" >
 
 # BreezeForest
 
@@ -37,13 +37,15 @@ Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf.
 
 ## Contributions
 
-1. I came up with the similar idea and code (I named it "BreezeForest") as BNAF 3 month after its publication. Encouraged by people who share the same idea with me, I conducted deeper research in this direction. 
-This repository is a snippet of my code developed for this research topic. The contributions of this repository compare to previous works is the following:
-1. BNAF has a special architecture, which enabled us to use numerical differential operator to compute the determinant of the triangular Jacobian matrix of the BNAF without computing layer by layer the whole Jacobian matrix. This reduces the objective complexity by one order of magnitude(from O(N^2) TO O(N)).
+I had an idea similar with BNAF,  I named it "BreezeForest".  BNAF had been published 3 month before I finished experiments and planned to write down the paper for "BreezeForest".  Despite the disappointement, I am also encouraged by people who share the same idea with me and they did really good job. So I decided to go deeper in this direction.
 
-2. I developed a batched bisection algorithm to find the inverse of the BNAF. This can be used to generate new samples from Gaussian noises, the generation demonstration of this report is based on it. 
+This repository show part of of my results, the contributions compare to BNAF is the following:
 
-3. Given a finite number of samples and complex enough model, One can always get infinitely high log likelihood by replicating from samples. Consequently, a generative model should have properly defined constraint to avoid this issue so as to be able to generate unseen sample. I merged BNAF with a Gaussian like density estimator into one neural network to solve regularize this issue. 
+1. BreezeForest(~BNAF) has a special architecture, which enabled us to use numerical differential operator to compute the loss function instead of computing layer by layer the whole Jacobian matrix as did BNAF. This reduces the objective complexity by one order of magnitude(from O(N^3) to O(N^2)).
+
+2. I developed a batched bisection algorithm to find the inverse of the BreezeForest. This can be used to generate new samples from random uniform distribution.
+
+3. Given a finite number of samples and complex enough model, One can always get infinitely high log likelihood by replicating from samples. Consequently, a generative model should have properly defined constraint to avoid this issue so as to generate unseen sample. I merged BreezeForest with a Gaussian like density estimator into one neural network to solve regularize this issue. 
 
 ## Method Illustration
 
