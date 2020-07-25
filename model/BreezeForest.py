@@ -3,7 +3,6 @@ import torch
 import numpy as np
 from torch import nn
 from torch.distributions import normal
-from torch.distributions import uniform
 from model.TreeLayer import TreeLayer
 from model.tools import bisection, Sigmoid, logit, sigmoid
 
@@ -76,8 +75,6 @@ class BreezeForest(torch.nn.Module):
         self.epsilon = torch.ones([1, self.dim]) * max_eps
         self.sap_mask = 1 - torch.ones([1, self.dim])
         self.use_mask = use_mask
-        self.u_dis = uniform.Uniform(low=torch.tensor(0.0), high=torch.tensor(1.0))
-
 
     def set_max_eps(self, max_eps):
         self.epsilon = torch.ones([1, self.dim]) * max_eps

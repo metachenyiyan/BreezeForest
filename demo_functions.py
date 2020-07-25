@@ -162,6 +162,5 @@ def generate_sample(model, std, mean, sample_size, multiplot, col_title):
             if col_title is not None:
                 frame.axes.set_title(col_title)
 
-
         if not multiplot:
             pyplot.show()
