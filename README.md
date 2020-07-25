@@ -41,17 +41,33 @@ Method Illustration
 
 BreezeForest is a bijective function (BF) that map n dimensional continious distribution X~P(X) to n dimensional independant Uniform distribution U~uniform(U):
 U = BF(X)
-We assume the cumulative density function of P(x) is:
+We assume the cumulative density function of P(x) is: 
+
 F(x1,x2...xn) = F(xn|xn-1...x1)...F(x3|x1, x2)F(x2|x1)F(x1)
-let Fi(x) = F(x|xi-1...x1), note that Fi depends on x1...xi-1
+let Fi(x) = F(x|xi-1...x1), note that Fi depends on x1...xi-1 and every where non decreasing. 
 x1...xi-1 give influence on Fi using breeze connection.
 Then we can parametrize F using BF by posing:
 BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)
 
 logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
-        
+=  log(dF1(x1)/dx1) + log( dF1(x2)/dx2) ... + log(dFn(xn)/dxn)
+
+
+
 2. Jacobian Free determinant computation using numerical approximation to the derivative:
 
+Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
+only 2 forward pass.
+
+First forward pass can compute: 
+
+BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi
+
+Once Fi is computed, we can do the second forward pass through them to get: 
+
+F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) 
+
+Finally:
 logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)
 =limit delta->0 : sum{log((Fi(xi+delta)-Fi(xi))/delta)} for (i=1..n)
 
