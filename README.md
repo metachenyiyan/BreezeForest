@@ -14,7 +14,7 @@ Background
 
 FLOW based generative models are usually used to model latent space density, 
 
-Block-wise Neural Autoregressive Flow(BNAF) first published by Nicola De CAO: 
+Block-wise Neural Autoregressive Flow(BNAF) first published by Nicola De CAO: <br/>
   https://nicola-decao.github.io/assets/pdf/UAI_poster.pdf <br/>
   https://arxiv.org/abs/1904.04676 <br/>
   https://github.com/nicola-decao/BNAF <br/>
@@ -24,7 +24,7 @@ Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf.
 
 Contributions
 
-I came up with the similar idea and code(I named it "BreezeForest") as BNAF 3 month after it's publication. Encouraged by  people who share the same idea with me, I conducted deeper research on this direction. 
+I came up with a similar idea and code(I named it "BreezeForest") as BNAF 3 month after it's publication. Encouraged by  people who share the same idea with me, I conducted deeper research on this direction. 
 
 This repository is a snippet of my code developed for this research topic. The contributions of this repository compare to previous works is the following:
 
