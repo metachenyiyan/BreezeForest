@@ -1,16 +1,16 @@
-# BreezeForest
+### BreezeForest
 
-Setup:
+##Setup:
 
 pip install requirements
 
-Run Demonstration:
+##Run Demonstration:
 
 python multi_dataset_demo
 or
 python one_dataset_demo
 
-Background
+##Background
 
 FLOW based generative models are usually used to model latent space density, 
 
@@ -22,7 +22,7 @@ is one of the FLOW based generative models.  A BNAF with only one hidden layer c
 compare to other models, BNAF requires much fewer layers to achieve the same precision. Furthermore, as an autoregressive flow model, BNAF  can be used to boost Explanable AI as described by:
 Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf. 
 
-Contributions
+##Contributions
 
 I came up with the similar idea and code(I named it "BreezeForest") as BNAF 3 month after it's publication. Encouraged by  people who share the same idea with me, I conducted deeper research on this direction. 
 
@@ -35,9 +35,9 @@ This repository is a snippet of my code developed for this research topic. The c
 3. Given finite number of samples and complex engough model, One can always get inifintely high log likelihood by replicating from samples. Consequently, a generative model should have
 properly defined constraint to avoid this issue so as to be able to generate unseen sample. I merged BNAF with a gaussian like density estimator  into one neural network to solve regularize this issue.   
 
-Method Illustration
+##Method Illustration
 
-1. Theorical fundation:
+#Theorical fundation:
 
 BreezeForest is a bijective function (BF) that map n dimensional continious distribution X~P(X) to n dimensional independant Uniform distribution U~uniform(U):
 U = BF(X)
@@ -54,7 +54,7 @@ logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
 
 
 
-2. Jacobian Free determinant computation using numerical approximation to the derivative:
+#Jacobian Free determinant computation using numerical approximation to the derivative:
 
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
 only 2 forward pass.
@@ -71,6 +71,6 @@ Finally:
 logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)
 =limit delta->0 : sum{log((Fi(xi+delta)-Fi(xi))/delta)} for (i=1..n)
 
-3. Control the ability of generating unseen samples:
+#Control the ability of generating unseen samples:
 
 
