@@ -1,5 +1,9 @@
 
-<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="cover image showing neuralnet and BreezeForest" >
+<p align="center">
+<img width="460" height="300" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="cover image showing neuralnet and BreezeForest" >
+
+</p>
+
 
 # BreezeForest
 
@@ -37,7 +41,7 @@ Block-wise Neural Autoregressive Flow (BNAF) first published by Nicola De CAO:
 
 I had an idea similar with BNAF,  I named it "BreezeForest".  BNAF had been published 3 month before I finished experiments and planned to write down the paper for "BreezeForest".  Despite a little disappointement, I am also encouraged by people who have the same thought with me and they did really great work. So I decided to go deeper in this direction.
 
-This repository show a snippet of of my results, the contributions compare to BNAF are the following:
+This repository show part of of my results, the contributions of this snippet compare to BNAF are the following:
 
 1. BreezeForest(~BNAF) has a special architecture, which enabled us to use numerical differential operator to compute the loss function instead of computing layer by layer the whole Jacobian matrix as did BNAF. This reduces the objective complexity by one order of magnitude(from O(N^3) to O(N^2)).
 
@@ -61,17 +65,17 @@ Then we can parametrize F using BF by posing:
 BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)
 
 logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
-=  log(dF1(x1)/dx1) + log( dF1(x2)/dx2) ... + log(dFn(xn)/dxn)
-<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" >
-As shown in the pictures, each dimension is associated to a "Tree", previous dimensions input value can give influence on later dimensions, by sending "breeze". where comes the name of BreezeForest.   
+=  log(dF1(x1)/dx1) + log( dF1(x2)/dx2) ... + log(dFn(xn)/dxn) <br/>
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" > <br/>
+As shown in the pictures, each dimension is associated  with a "Tree", previous dimensions input value can give influence on later dimensions by sending "breeze". where comes the name "BreezeForest".   
 
 ### 2. Jacobian Free determinant computation using numerical approximation to the derivative:
 
 
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
-only 2 forward pass.
+only 2 forward pass.<br/>
 <img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt5.png" title="first regular forward pass" >
-
+<br/>
 First forward pass can compute: 
 
 BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi
