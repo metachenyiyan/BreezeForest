@@ -57,13 +57,12 @@ BreezeForest is a bijective function (BF) that map n dimensional continious dist
 U = BF(X)
 We assume the cumulative density function of P(x) is: 
 
-F(x1,x2...xn) = F(xn|xn-1...x1)...F(x3|x1, x2)F(x2|x1)F(x1)
+F(x1,x2...xn) = F(xn|xn-1...x1)...F(x3|x1, x2)F(x2|x1)F(x1) <br/>
 let Fi(x) = F(x|xi-1...x1), note that Fi depends on x1...xi-1 and every where non decreasing. 
 x1...xi-1 give influence on Fi using breeze connection.
 Then we can parametrize F using BF by posing:
-BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)
-
-logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
+BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)<br/>
+logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular<br/>
 =  log(dF1(x1)/dx1) + log( dF1(x2)/dx2) ... + log(dFn(xn)/dxn) <br/>
 <p align="center">
 <img width="350" height="500" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" >
@@ -83,7 +82,7 @@ only 2 forward pass. The image below choose the second "Tree"(X2) to illustrate 
 
 First forward pass can compute: 
 
-BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi
+BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi. <br/>
 
 Once Fi is computed, we can do the second forward pass through them to get: 
 
@@ -96,8 +95,8 @@ The image below  choose the second "Tree"(X2) to illustrate the second forward p
 
 Note that the second forward pass make use of previously computed breeze connections rather than recompute them again. 
 Finally:
-logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)
-=limit delta->0 : sum{log((Fi(xi+delta)-Fi(xi))/delta)} for (i=1..n)
+logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)<br/>
+=limit delta->0 : sum{log((Fi(xi+delta)-Fi(xi))/delta)} for (i=1..n)<br/>
 pratically in the code, I choosed delta = 0.0001. 
 
 ### 3. Control the ability of generating unseen samples:
