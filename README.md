@@ -75,7 +75,7 @@ As shown in the pictures, each dimension is associated  with a "Tree", previous 
 
 
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
-only 2 forward pass.
+only 2 forward pass. The image below choose the second "Tree"(X2) to illustrate the first forward pass:
 
 <p align="center">
 <img width="350" height="500"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt5.png" title="first regular forward pass"  >
@@ -87,7 +87,8 @@ BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connectio
 
 Once Fi is computed, we can do the second forward pass through them to get: 
 
-F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) :
+F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) 
+The image below  choose the second "Tree"(X2) to illustrate the second forward pass:
 
 <p align="center">
 <img width="350" height="500" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt6.png" title="second simplified forward pass to caculate the diagonal elements of jacobian matrix" >
