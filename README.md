@@ -1,6 +1,6 @@
 
 <p align="center">
-<img width="460" height="300" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="cover image showing neuralnet and BreezeForest" >
+<img width="1000" height="700" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="cover image showing neuralnet and BreezeForest" >
 
 </p>
 
