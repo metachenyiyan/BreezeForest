@@ -1,7 +1,6 @@
 
 <p align="center">
 <img width="1000" height="700" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="cover image showing neuralnet and BreezeForest" >
-
 </p>
 
 
@@ -66,7 +65,10 @@ BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)
 
 logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
 =  log(dF1(x1)/dx1) + log( dF1(x2)/dx2) ... + log(dFn(xn)/dxn) <br/>
-<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" > <br/>
+<p align="center">
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" >
+</p>
+ <br/>
 As shown in the pictures, each dimension is associated  with a "Tree", previous dimensions input value can give influence on later dimensions by sending "breeze". where comes the name "BreezeForest".   
 
 ### 2. Jacobian Free determinant computation using numerical approximation to the derivative:
