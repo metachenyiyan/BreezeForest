@@ -75,21 +75,19 @@ As shown in the pictures, each dimension is associated  with a "Tree", previous 
 
 
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
-only 2 forward pass.<br/>
-
-
+only 2 forward pass.
+<br/>
 <p align="center">
 <img width="350" height="500"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt5.png" title="first regular forward pass"  >
 </p>
  <br/>
-
 First forward pass can compute: 
 
 BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi
 
 Once Fi is computed, we can do the second forward pass through them to get: 
 
-F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) 
+F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) :
 
  <br/>
 <p align="center">
@@ -97,7 +95,7 @@ F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta)
 </p>
  <br/>
 
-Note that the second forward pass make use of previuously computed breeze connections rather than recompute them again. 
+Note that the second forward pass make use of previously computed breeze connections rather than recompute them again. 
 
 Finally:
 logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)
@@ -105,9 +103,7 @@ logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP
 pratically in the code, I choosed delta = 0.0001. 
 
 ### 3. Control the ability of generating unseen samples:
- <br/>
 <p align="center">
 <img width="1500" height="900"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/multiplot.png" title="multi_generation_ex" >
  </p>
- <br/>
 This figure shows points generated after learning the original 2d tubular dataset. the generation is done by the batched bisection algorithm, the hyperParameter  "sapw" is used to control the ability to generating unseen samples. 
