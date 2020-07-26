@@ -48,9 +48,9 @@ This repository show part of of my results, the contributions of this snippet co
 
 3. Given a finite number of samples and complex enough model, One can always get infinitely high log likelihood by replicating from samples. Consequently, a generative model should have properly defined constraint to avoid this issue so as to generate unseen sample. I merged BreezeForest with a Gaussian like autoregressive density estimator into one neural network to solve regularize this issue. 
 
-## Method Illustration
+## Method illustration
 
-### 1. Theorical fundation:
+### 1. Theoretical fundation:
 
 
 BreezeForest is a bijective function (BF) that map n dimensional continious distribution X \~P(X) to n dimensional independant Uniform distribution U \~uniform(U):
