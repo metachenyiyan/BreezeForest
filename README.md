@@ -107,7 +107,7 @@ pratically in the code, I choosed delta = 0.0001.
 ### 3. Control the ability of generating unseen samples:
  <br/>
 <p align="center">
-<img width="1000" height="700"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/multiplot.png" title="multi_generation_ex" >
+<img width="1200" height="900"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/multiplot.png" title="multi_generation_ex" >
  </p>
  <br/>
 This figure shows points generated after learning the original 2d tubular dataset. the generation is done by the batched bisection algorithm, the hyperParameter  "sapw" is used to control the ability to generating unseen samples. 
