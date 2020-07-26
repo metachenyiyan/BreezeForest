@@ -3,7 +3,7 @@
 
 # BreezeForest
 
-> An efficient flow based generative model
+> An efficient flow based generative model, proven to be universal density estimator. 
 
 ## Setup:
 
@@ -49,6 +49,7 @@ This repository show part of of my results, the contributions compare to BNAF ar
 
 ### 1. Theorical fundation:
 <img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt3.png" title="multi_generation_ex" >
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="multi_generation_ex" >
 
 BreezeForest is a bijective function (BF) that map n dimensional continious distribution X \~P(X) to n dimensional independant Uniform distribution U \~uniform(U):
 U = BF(X)
@@ -66,9 +67,10 @@ logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
 
 ### 2. Jacobian Free determinant computation using numerical approximation to the derivative:
 
-<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt2.png" title="multi_generation_ex" >
+
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
 only 2 forward pass.
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt5.png" title="multi_generation_ex" >
 
 First forward pass can compute: 
 
@@ -77,6 +79,8 @@ BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connectio
 Once Fi is computed, we can do the second forward pass through them to get: 
 
 F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) 
+
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt6.png" title="multi_generation_ex" >
 
 Note that the second forward pass make use of previuously computed breeze connections rather than recompute them again. 
 
