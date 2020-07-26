@@ -68,7 +68,7 @@ logP(X) = logdet(JacobianBF(X)) where JacobianBF(X) is always lower triangular
 <p align="center">
 <img width="350" height="500" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt4.png" title="BreezeForest illustration" >
 </p>
- <br/>
+ 
 As shown in the pictures, each dimension is associated  with a "Tree", previous dimensions input value can give influence on later dimensions by sending "breeze". where comes the name "BreezeForest".   
 
 ### 2. Jacobian Free determinant computation using numerical approximation to the derivative:
@@ -76,11 +76,11 @@ As shown in the pictures, each dimension is associated  with a "Tree", previous 
 
 Instead of computing jacobian matrix layer by layer, we can compute the determinant of jacobian by doing 
 only 2 forward pass.
-<br/>
+
 <p align="center">
 <img width="350" height="500"  src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt5.png" title="first regular forward pass"  >
 </p>
- <br/>
+
 First forward pass can compute: 
 
 BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connections used to parametrize Fi
@@ -89,14 +89,11 @@ Once Fi is computed, we can do the second forward pass through them to get:
 
 F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) :
 
- <br/>
 <p align="center">
 <img width="350" height="500" src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt6.png" title="second simplified forward pass to caculate the diagonal elements of jacobian matrix" >
 </p>
- <br/>
 
 Note that the second forward pass make use of previously computed breeze connections rather than recompute them again. 
-
 Finally:
 logP(x1,x2...xn) = logP(xn|xn-1...x1) +...+ logP(x3|x1, x2) + logP(x2|x1) + logP(x1)
 =limit delta->0 : sum{log((Fi(xi+delta)-Fi(xi))/delta)} for (i=1..n)
