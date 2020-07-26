@@ -1,5 +1,6 @@
 
 <img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/ppt1.png" title="multi_generation_ex" >
+
 # BreezeForest
 
 > An efficient flow based generative model
@@ -30,8 +31,7 @@ Block-wise Neural Autoregressive Flow (BNAF) first published by Nicola De CAO:
 > https://arxiv.org/abs/1904.04676  
 > https://github.com/nicola-decao/BNAF   
  
- is one of the most powerful among them. A BNAF with only one hidden layer has been proven to be a universal density estimator. Consequently, compare to other models, BNAF requires much fewer layers to achieve the same precision. Furthermore, as an autoregressive flow model, BNAF can be used to boost Explanable AI as described by:
-Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf. 
+ is one of the most powerful among them. A BNAF with only one hidden layer has been proven to be a universal density estimator. Consequently, compare to other models, BNAF requires much fewer layers to achieve the same precision. Furthermore, as an autoregressive flow model, BNAF can be used to boost Explanable AI as described by the paper of Graphical Normalizing Flow: https://arxiv.org/pdf/2006.02548.pdf. 
 
 ## Contributions
 
