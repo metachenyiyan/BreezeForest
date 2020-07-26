@@ -87,7 +87,7 @@ BF(x1, x2...xn)  = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn) with all breeze connectio
 
 Once Fi is computed, we can do the second forward pass through them to get: 
 
-F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) 
+F1(x1+delta), F2(x2+delta)...Fn-1(xn-1+delta), Fn(xn+delta) <br/>
 The image below  choose the second "Tree"(X2) to illustrate the second forward pass:
 
 <p align="center">
