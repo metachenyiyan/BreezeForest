@@ -1,4 +1,4 @@
-<img src="https://avatars1.githubusercontent.com/u/4284691?v=3&s=200" title="BreezeForest Structure" >
+<img src="https://github.com/metachenyiyan/BreezeForest/blob/master/results/multiplot.png" title="BreezeForest Structure" >
 
 # BreezeForest
 
