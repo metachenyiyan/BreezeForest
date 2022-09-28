@@ -55,10 +55,11 @@ This repository show part of of my results, the contributions of this snippet co
 
 BreezeForest is a bijective function (BF) that map n dimensional continious distribution X \~P(X) to n dimensional independant Uniform distribution U \~uniform(U):
 U = BF(X)
-We assume the cumulative density function of P(x) is: 
+We assume the density function of P(x) is: 
 
-F(x1,x2...xn) = F(xn|xn-1...x1)...F(x3|x1, x2)F(x2|x1)F(x1) <br/>
-let Fi(x) = F(x|xi-1...x1), note that Fi depends on x1...xi-1 and every where non decreasing. 
+P(x1,x2...xn) = P(xn|xn-1...x1)...P(x3|x1, x2)P(x2|x1)P(x1) <br/>
+Instead of expressing directly the conditional density functions using a neural network, we approximate the conditional 
+cumulative functions: let Fi(x) = P(X<=x|Xi-1=xi-1...X1=x1) = Fi(x|Xi-1=xi-1...X1=x1), note that Fi depends on x1...xi-1 and every where increasing. 
 x1...xi-1 give influence on Fi using breeze connection.
 Then we can parametrize F using BF by posing:
 BF(x1,x2...xn) = F1(x1), F2(x2)...Fn-1(xn-1), Fn(xn)<br/>
