@@ -3,11 +3,13 @@ import torch
 import numpy as np
 from torch import nn
 from torch.distributions import normal
+from torch.func import jacrev, vmap
 from model.TreeLayer import TreeLayer
 from model.tools import bisection, Sigmoid, logit, sigmoid
 
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
+# torch.set_default_tensor_type('torch.cuda.FloatTensor')  # Commented out for CPU compatibility
+torch.set_default_tensor_type('torch.FloatTensor')
 
 """
 ht-1 to zt, conditional is universal or only gaussian
@@ -158,6 +160,58 @@ class BreezeForest(torch.nn.Module):
             x_logDet = torch.sum(torch.mean(torch.log(du_dx), dim=0))
 
         return x * self.dim_mask, x_logDet
+
+    def train_forward_exact(self, x):
+        """
+        Compute forward pass with exact Jacobian determinant using torch.func.jacrev.
+
+        For block-wise lower-triangular Jacobian matrices (autoregressive structure),
+        this computes the exact log|det(J)| efficiently using automatic differentiation.
+
+        :param x: input tensor (batch_size, dim)
+        :return: (transformed x, mean log|det(J)| over batch)
+        """
+        self.batch_example = x
+
+        # Define single-sample forward function for jacrev
+        def single_forward(x_single):
+            """Forward pass for a single sample (no batch dimension)"""
+            x_single = x_single.unsqueeze(0)  # Add batch dim
+            breeze_list = []
+            y_single = self.forward(x_single, breeze_list)
+            return y_single.squeeze(0)  # Remove batch dim
+
+        # Compute Jacobian for each sample in batch using vmap
+        # jacrev computes Jacobian using reverse-mode AD
+        # vmap vectorizes over the batch dimension
+        try:
+            # Try using vmap + jacrev for efficiency
+            jacobian_fn = vmap(jacrev(single_forward))
+            jacobians = jacobian_fn(x)  # Shape: (batch_size, dim, dim)
+
+            # Compute log|det(J)| for each sample
+            # Using slogdet for numerical stability
+            sign, log_det = torch.linalg.slogdet(jacobians)
+
+            # Mean over batch
+            mean_log_det = torch.mean(log_det)
+
+        except Exception as e:
+            # Fallback: compute one sample at a time if vmap fails
+            print(f"Warning: vmap failed ({e}), falling back to loop-based computation")
+            log_dets = []
+            for i in range(x.shape[0]):
+                x_single = x[i]
+                jac = jacrev(single_forward)(x_single)
+                _, log_det_single = torch.linalg.slogdet(jac)
+                log_dets.append(log_det_single)
+            mean_log_det = torch.mean(torch.stack(log_dets))
+
+        # Forward pass for output
+        breeze_list = []
+        y = self.forward(x, breeze_list)
+
+        return y * self.dim_mask, mean_log_det
 
     def func(self, x, bias_breezes, tree_weights, tree_bias, tree_scale, sapw):
 

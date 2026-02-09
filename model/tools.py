@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 from torch.distributions import normal
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
+# torch.set_default_tensor_type('torch.cuda.FloatTensor')  # Commented out for CPU compatibility
+torch.set_default_tensor_type('torch.FloatTensor')
 
 class Logit(nn.Module):
     def forward(self, x):
@@ -16,9 +17,12 @@ def logit(x,max_v=1.0):
 
 def sigmoid(x, max_v=1.0):
     # 2*max_v -
-    sign = (torch.sign(x) + 3)//3
-    x = torch.abs(x)
-    res = max_v/(1 + torch.exp(-x))
+    # Use differentiable operations instead of floor_divide
+    # torch.sign(x) returns {-1, 0, 1}, we want {0, 1, 1}
+    # Replace floor division with clamped float division
+    sign = torch.clamp((torch.sign(x) + 1), min=0, max=1)  # {-1,0,1} -> {0,1,2} -> {0,1,1}
+    x_abs = torch.abs(x)
+    res = max_v/(1 + torch.exp(-x_abs))
     res = res * sign + (1 - sign) * (max_v - res)
     return res
 
@@ -87,17 +91,19 @@ def bisection(target, inc_func,  distribution=None, gap_dis=0.1, gap_real=0.001,
 
     guess_U = torch.ones_like(target)
     guess_L = torch.zeros_like(target)
-    done_mask = (torch.sign(guess_L + gap_dis - guess_U) + 3) // 3
+    # Use differentiable comparison instead of floor_divide
+    done_mask = (guess_L + gap_dis >= guess_U).float()
 
     while(not torch.all(done_mask.bool())):
         guess = (guess_L + guess_U) / 2
         # print(guess)
         res = torch.sign(inc_func(distribution.icdf(guess)) - target)
-        geq_mask = (res + 3) // 3
-        leq_mask = (-res + 3) // 3
+        # Use differentiable operations: sign gives {-1,0,1}, we want masks for >= 0 and <= 0
+        geq_mask = (res >= 0).float()
+        leq_mask = (res <= 0).float()
         guess_U = guess * geq_mask + guess_U*(-geq_mask + 1)
         guess_L = guess * leq_mask + guess_L*(-leq_mask + 1)
-        done_mask = (torch.sign(guess_L + gap_dis - guess_U) + 3) // 3
+        done_mask = (guess_L + gap_dis >= guess_U).float()
 
     guess_U.clamp_(max=anomaly_dis)
     guess_L.clamp_(min=1-anomaly_dis)
@@ -107,16 +113,16 @@ def bisection(target, inc_func,  distribution=None, gap_dis=0.1, gap_real=0.001,
 
 
     guess = (guess_L + guess_U) / 2
-    done_mask = (torch.sign(guess_L + gap_real - guess_U) + 3)//3
+    done_mask = (guess_L + gap_real >= guess_U).float()
     while (not torch.all(done_mask.bool())):
         k = inc_func(guess)
         res = torch.sign(k - target)
-        geq_mask = (res + 3) // 3
-        leq_mask = (-res + 3) // 3
+        geq_mask = (res >= 0).float()
+        leq_mask = (res <= 0).float()
         gp = guess_U
         guess_U = guess * geq_mask + guess_U*(-geq_mask + 1)
         guess_L = guess * leq_mask + guess_L*(-leq_mask + 1)
-        done_mask = (torch.sign(guess_L + gap_real - guess_U) + 3) // 3
+        done_mask = (guess_L + gap_real >= guess_U).float()
         guess = (guess_L + guess_U) / 2
     return guess
 
