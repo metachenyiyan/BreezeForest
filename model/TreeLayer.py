@@ -6,7 +6,8 @@ import torch.nn as nn
 from math import sqrt
 from model.tools import Sigmoid, actinorm_init_bias, actinorm_init_scale
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
+# torch.set_default_tensor_type('torch.cuda.FloatTensor')  # Commented out for CPU compatibility
+torch.set_default_tensor_type('torch.FloatTensor')
 
 class TreeLayer(torch.nn.Module):
     """
