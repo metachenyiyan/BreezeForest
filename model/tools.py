@@ -68,63 +68,43 @@ class CdfGaussian(nn.Module):
         return torch.erfinv(2*y - 1) * sqrt(2.0)
 
 
-def bisection(target, inc_func,  distribution=None, gap_dis=0.1, gap_real=0.001, anomaly_dis=1-0.001):
+def bisection(target, inc_func, distribution=None, gap_dis=0.1, gap_real=0.001, anomaly_dis=1-0.001):
     """
-    tensor([
-    [0.0800],
-    [-0.2402],
-    [0.3205],
-    [0.0400],
-    [-0.1040],
-    [-0.1601]
-    ])
-    :param inc_func:  Rn -> Rn piece-wise increasing function, dimensions are independent as a batch
-    :param guess_L: batch_size
-    :param guess_U: batch_size
-    :param gap_epsilon:
-    :return:
-    """
+    Find x such that inc_func(x) = target via two-stage bisection.
+    Stage 1: coarse search in distribution CDF space [0, 1].
+    Stage 2: fine search in real space with tighter tolerance.
 
+    :param target: target values (batch_size, 1)
+    :param inc_func: piece-wise increasing function, batched over dim 0
+    :param distribution: reference distribution (default: standard normal)
+    :param gap_dis: convergence tolerance for CDF-space stage
+    :param gap_real: convergence tolerance for real-space stage
+    :param anomaly_dis: CDF clamp boundary to avoid infinite icdf values
+    :return: x such that inc_func(x) ≈ target
+    """
     if distribution is None:
         distribution = normal.Normal(0, 1)
 
+    def _bisect(lo, hi, eval_fn, gap):
+        while not torch.all(lo + gap >= hi):
+            mid = (lo + hi) / 2
+            too_high = (eval_fn(mid) >= target)
+            hi = torch.where(too_high, mid, hi)
+            lo = torch.where(~too_high, mid, lo)
+        return lo, hi
 
-    guess_U = torch.ones_like(target)
-    guess_L = torch.zeros_like(target)
-    # Use differentiable comparison instead of floor_divide
-    done_mask = (guess_L + gap_dis >= guess_U).float()
+    # Stage 1: coarse search in CDF space
+    lo, hi = _bisect(
+        torch.zeros_like(target), torch.ones_like(target),
+        lambda m: inc_func(distribution.icdf(m)), gap_dis,
+    )
+    # Map to real space, clamping to avoid icdf blowup at boundaries
+    lo = distribution.icdf(lo.clamp(min=1 - anomaly_dis))
+    hi = distribution.icdf(hi.clamp(max=anomaly_dis))
 
-    while(not torch.all(done_mask.bool())):
-        guess = (guess_L + guess_U) / 2
-        # print(guess)
-        res = torch.sign(inc_func(distribution.icdf(guess)) - target)
-        # Use differentiable operations: sign gives {-1,0,1}, we want masks for >= 0 and <= 0
-        geq_mask = (res >= 0).float()
-        leq_mask = (res <= 0).float()
-        guess_U = guess * geq_mask + guess_U*(-geq_mask + 1)
-        guess_L = guess * leq_mask + guess_L*(-leq_mask + 1)
-        done_mask = (guess_L + gap_dis >= guess_U).float()
-
-    guess_U.clamp_(max=anomaly_dis)
-    guess_L.clamp_(min=1-anomaly_dis)
-
-    guess_U = distribution.icdf(guess_U)
-    guess_L = distribution.icdf(guess_L)
-
-
-    guess = (guess_L + guess_U) / 2
-    done_mask = (guess_L + gap_real >= guess_U).float()
-    while (not torch.all(done_mask.bool())):
-        k = inc_func(guess)
-        res = torch.sign(k - target)
-        geq_mask = (res >= 0).float()
-        leq_mask = (res <= 0).float()
-        gp = guess_U
-        guess_U = guess * geq_mask + guess_U*(-geq_mask + 1)
-        guess_L = guess * leq_mask + guess_L*(-leq_mask + 1)
-        done_mask = (guess_L + gap_real >= guess_U).float()
-        guess = (guess_L + guess_U) / 2
-    return guess
+    # Stage 2: fine search in real space
+    lo, hi = _bisect(lo, hi, inc_func, gap_real)
+    return (lo + hi) / 2
 
 
 def get_epsilons(max_epsilon, dim, decay=1.0):
