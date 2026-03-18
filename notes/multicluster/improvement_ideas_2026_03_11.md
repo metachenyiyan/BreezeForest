@@ -1,197 +1,300 @@
 # BreezeForest Multi-Cluster Generation Problem: Top 3 Improvement Ideas
-**Date**: 2026-03-11
-**Problem**: When trained on multi-cluster datasets (e.g., 8 Gaussians), BreezeForest / MultiBF generates points that fall between clusters — outside the reasonable range of any training cluster. Extending training time and adjusting learning rate do not fix this.
+**Date**: 2026-03-11 (updated with verified 2025-2026 papers)
+**Problem**: When trained on multi-cluster datasets (e.g., 8 Gaussians), BreezeForest / MultiBF
+generates points that fall between clusters — outside the reasonable range of any training cluster.
+Extending training time and adjusting learning rate do not fix this.
 
 ---
 
 ## Root Cause Analysis
 
-### 1. Topological Mismatch (Primary Root Cause)
-BreezeForest maps from a **connected** latent space `Uniform(0.01, 0.99)^d` to a potentially **disconnected** target space (multiple separated clusters). Because continuous bijective maps preserve topology, a connected latent domain cannot perfectly map to a disconnected target without either (a) creating "corridor" regions with non-zero density between clusters, or (b) collapsing some latent volume to measure-zero (which a smooth bijection cannot do exactly). In practice, BreezeForest learns to put the corridor regions in "transition zones" with low but non-zero density — and since these regions have non-zero density, they occasionally get sampled.
-
-The key evidence for this: the problem persists regardless of training duration or learning rate, because it is a **structural property** of the bijection, not an optimization failure.
-
-### 2. MultiBF Component Non-Exclusivity (Secondary Root Cause)
-MultiBF trains K BreezeForest components with a soft `logsumexp` objective:
+### 1. Component Non-Specialization (Primary Root Cause — most tractable)
+MultiBF trains K BreezeForest components with a **soft `logsumexp` objective**:
 ```
-log p(x) = logsumexp_k(log pi_k + log|det J_k(x)|)
+log p(x) = logsumexp_k(log π_k + log|det J_k(x)|)
 ```
-This allows every component to contribute to every data point (soft assignment via gradient descent). Components do NOT specialize to individual clusters unless pushed to do so. Result: each component learns to cover multiple clusters or the full distribution, meaning each component individually still has the topological mismatch problem.
+This allows every component to contribute to every data point simultaneously (soft gradient
+assignment). Components do NOT specialize to individual clusters unless explicitly pushed to do so.
+Result: each component independently covers multiple clusters, and the mixture fails to cleanly
+partition the data space.
 
-In practice, with K=3 components for 8 Gaussians, each component covers ~2-3 clusters, and each of those 3 components independently creates inter-cluster corridors.
+This is also called **mode collapse from the opposite direction**: instead of missing modes, each
+component "occupies" too many modes. The 2026 paper arXiv:2602.12923 derives a sharp theoretical
+formula for this failure probability.
 
-### 3. Smooth Sigmoid Activation (Contributing Factor)
-The sigmoid activation in TreeLayer creates smooth, stretched mappings. For multi-cluster targets, this smoothness means the flow assigns non-trivial density to the "transition" regions between clusters rather than assigning them near-zero density. A more expressive activation could create sharper cluster boundaries.
+### 2. Topological Mismatch (Structural Root Cause — harder to fix)
+Each BreezeForest maps from the **connected** latent space `Uniform(0.01, 0.99)^d` to a potentially
+**disconnected** target (multiple separated clusters). A continuous bijection from a connected domain
+cannot model a disconnected target without creating "corridors" with non-zero density in between
+clusters. This is topologically unavoidable with a single flow.
+
+Supporting evidence: the problem persists regardless of training duration, because it is a
+**structural property** of the bijection — not an optimization failure.
+
+### 3. Shared Flat Base Distribution (Secondary Structural Cause)
+All components in MultiBF draw their latent code from the same `Uniform(0.01, 0.99)^d` range.
+Nothing constrains component k's samples to a specific region in latent space. Even if component k
+specializes to cluster k, its full `(0.01, 0.99)^d` domain contains latent codes that map to
+inter-cluster regions.
+
+### 4. Sigmoid Smoothness (Contributing Factor)
+The sigmoid activation in TreeLayer creates smooth, stretched mappings from `R` to `(0,1)`. For
+multi-cluster targets this smoothness means the flow assigns non-trivial density to "transition"
+regions between clusters rather than near-zero density. More expressive activations (splines) can
+create sharper cluster boundaries.
 
 ---
 
 ## Top 3 Improvement Ideas
 
+Priority ordering: **fix the most tractable root cause first, with the least architectural change**.
+
 ---
 
-### Idea 1: Component-Specific Learnable Gaussian Base Distributions (Logit-Space GMM Prior)
+### Idea 1 ★★★★★: EM / Natural Gradient EM (nGEM) Responsibility-Weighted Training
 
-**Target root cause**: Topological mismatch (Root Cause #1) and Component non-exclusivity (Root Cause #2)
+**Target root cause**: Component non-specialization (Root Cause #1)
+**Architectural change**: Zero — training procedure only
 
-**Core idea**: Replace the flat `Uniform(0.01, 0.99)^d` base distribution in MultiBF with a **component-specific Gaussian-in-logit-space distribution**. For each component k:
-- Maintain learnable parameters `mu_k ∈ R^d` and `log_sigma_k ∈ R^d`
-- During sampling: draw `v_k ~ Normal(mu_k, exp(log_sigma_k))`, then map `z_k = sigmoid(v_k) ∈ (0,1)^d`
-- Use `z_k` as the bisection target for component k (instead of `torch.rand * 0.98 + 0.01`)
+**Core idea**: Replace MultiBF's gradient-based soft assignment with an EM-style loop that computes
+per-sample cluster responsibilities and weights each component's gradient update accordingly.
 
-This is equivalent to a **learnable Gaussian Mixture Model prior in the logit-transformed latent space** (the pre-sigmoid space), which becomes a mixture of Beta-like distributions in the bounded `(0,1)^d` space.
+**Standard EM formulation**:
+- **E-step**: Compute per-sample responsibilities:
+  ```
+  r_ik = π_k · p_k(x_i) / Σ_j(π_j · p_j(x_i))
+  ```
+- **M-step**: Update each component k using gradients weighted by `r_ik`:
+  ```python
+  loss_k = -mean_i(r_ik * log_p_k(x_i))   # responsibility-weighted NLL per component
+  π_k    = mean_i(r_ik)                    # mixture weight update
+  ```
 
-**Why it works**:
-- Each component k now samples from a **concentrated region** in latent space centered at `sigmoid(mu_k)`, rather than the entire `(0.01, 0.99)^d` range
-- If component k is trained to cover cluster k, its `mu_k` naturally converges to the latent code corresponding to cluster k's center
-- Points in inter-cluster latent regions have near-zero probability under `Normal(mu_k, sigma_k)` → they are rarely sampled → inter-cluster generation eliminated
-- During training: add `mu_k`, `log_sigma_k` as trainable parameters; compute the base log-density contribution in the NLL loss
+**Natural Gradient upgrade (nGEM)**:
+The 2026 paper arXiv:2602.10602 (nGEM) reinterprets mixture density networks as deep latent-variable
+models, derives a natural gradient EM objective from information geometry, and achieves:
+- **10× faster convergence** than standard NLL gradient descent
+- **Zero additional computational overhead** vs standard EM
+- **Prevents mode collapse** where standard NLL fails in high-dimensional settings
 
-**During training**, the full log-likelihood with this prior becomes:
-```
-log p(x) = logsumexp_k(log pi_k + log|det J_k(x)| + log p_base_k(f_k(x)))
-```
-where `log p_base_k(u)` is the Gaussian density in logit space evaluated at `logit(f_k(x))`.
+The nGEM objective modifies the M-step gradient to follow the natural gradient (Fisher information
+geometry of the mixture), which is much better conditioned for mixture optimization than the
+standard Euclidean gradient.
 
-**Implementation sketch** (in MultiBF):
+**Why it works for BreezeForest**:
+- Responsibility weighting forces each component k to explain only data points near cluster k
+- Once component k covers only cluster k, its forward mapping only needs to model one cluster →
+  the topological mismatch per component is dramatically reduced (single cluster ≈ unimodal)
+- nGEM's faster convergence means the specialization happens reliably, not just asymptotically
+
+**Add-on: Assignment entropy regularization** to further sharpen specialization:
 ```python
-# Add to MultiBF.__init__:
-self.base_mu = nn.Parameter(torch.zeros(n_components, dim))         # logit-space mean
-self.base_log_sigma = nn.Parameter(torch.zeros(n_components, dim))  # logit-space log-std
-
-# In MultiBF.inverse_map, replace:
-#   z = torch.rand(n_k, self.dim) * 0.98 + 0.01
-# with:
-v_k = self.base_mu[k] + torch.exp(self.base_log_sigma[k]) * torch.randn(n_k, self.dim)
-z = torch.sigmoid(v_k)  # map to (0,1)^d
-
-# In MultiBF.train_forward, add log_base_k to component log-probs:
-u_k = bf.forward(x, ...)  # the latent code in (0,1)^d
-v_k = logit(u_k)           # transform to logit space
-log_base_k = Normal(base_mu[k], exp(base_log_sigma[k])).log_prob(v_k).sum(-1)
-component_log_probs.append(log_pi[k] + per_sample_ld + log_base_k)
+# Minimize assignment entropy → harder, more exclusive assignments
+H = -sum_k r_ik * log(r_ik + eps)   # per-sample entropy
+L_total = L_nll_weighted - λ * mean(H)
 ```
+
+**Initialization tip**: Use k-means on training data to initialize each component's ActiNorm bias to
+a different cluster center. This gives EM a warm start that avoids degenerate solutions.
+
+**AMF-VI approach (arXiv:2510.02056)**: Rather than joint gradient training, train each flow
+component **sequentially** as an expert on its assigned data subset, then do a second pass of
+adaptive global weight estimation via likelihood-driven updates. This "two-stage sequential + global
+re-weighting" completely avoids the soft assignment problem.
 
 **Supporting literature**:
-- **arXiv:2512.04954** (Amortized Inference of Multi-Modal Posteriors, 2024): "Standard unimodal base distributions fail to capture disconnected support in multi-modal posteriors, creating spurious probability bridges between modes. Using a GMM matched to the cardinality of target modes **significantly improves reconstruction fidelity**."
-- **arXiv:2503.00524** (End-to-End Learning of GMM Priors for Diffusion Samplers, 2025): End-to-end learnable GMM priors counteract mode collapse and improve exploration of multi-modal targets.
-- **arXiv:2510.07965** (Stick-Breaking Mixture Normalizing Flows, 2025): Component-wise base distributions with separate tail transforms improve mode coverage in posterior inference.
+- **arXiv:2602.10602** (nGEM, Feb 2026): Natural Gradient EM for mixture density networks.
+  *10× faster convergence, prevents mode collapse, zero overhead.* Directly applicable to MultiBF.
+- **arXiv:2602.12923** (Annealing in VI mitigates mode collapse, Feb 2026): Derives a sharp
+  theoretical formula for mode collapse probability in mixture flows. Shows that "appropriately
+  chosen annealing mitigates mode collapse robustly" — provides guidance for combining EM with
+  temperature annealing.
+- **arXiv:2510.02056** (AMF-VI, Oct 2025): Adaptive heterogeneous mixture flows. Sequential
+  per-expert training + adaptive global weights achieves consistently lower NLL than joint training
+  across 6 benchmark posteriors including bimodal and five-mode mixture.
+- **arXiv:2301.06404** (Ng & Zammit-Mangion 2023): EM for mixture of normalizing flows on
+  spheres — explicitly shows EM yields cleaner cluster separation than gradient-based joint training.
 
-**Assessment**: **Highest priority**. Directly addresses the structural root cause with minimal architectural change (only affects the sampling step and the prior term in the loss). Does not require changing BreezeForest's tree layers, bisection algorithm, or training procedure beyond adding parameters and a prior term.
+**Assessment**: Highest priority. Zero architectural change. Directly eliminates the component
+non-specialization root cause. Can be implemented as a training loop change in `demo_multi_bf.py`
+without touching any model files.
 
 ---
 
-### Idea 2: EM-Style Hard/Soft Assignment Training for MultiBF Components
+### Idea 2 ★★★★☆: Per-Component Learnable Gaussian Base Distribution (Logit-Space GMM Prior)
 
-**Target root cause**: Component non-exclusivity (Root Cause #2)
+**Target root cause**: Topological mismatch + Shared flat base distribution (Root Causes #2 & #3)
+**Architectural change**: Small — add `2 × K × d` parameters to MultiBF
 
-**Core idea**: Replace MultiBF's current gradient-based soft assignment (log-sum-exp training) with an **Expectation-Maximization (EM) algorithm** that forces components to specialize in individual clusters:
+**Core idea**: Replace the flat `Uniform(0.01, 0.99)^d` base in MultiBF with a **component-specific
+Gaussian distribution in the logit-transformed latent space**. For component k:
+- Maintain learnable parameters `μ_k ∈ R^d` and `log_σ_k ∈ R^d`
+- During sampling: draw `v_k ~ Normal(μ_k, exp(log_σ_k))`, map `z_k = sigmoid(v_k) ∈ (0,1)^d`
+- Use `z_k` as the bisection target for component k
 
-- **E-step (component assignment)**: For each data point `x_i`, compute soft cluster responsibilities:
-  ```
-  r_ik = pi_k * p_k(x_i) / sum_j(pi_j * p_j(x_i))
-  ```
-  Optionally harden: `r_ik = 1 if argmax_k, else 0` (hard EM).
+This gives each component a **concentrated, cluster-specific sampling region** in latent space,
+rather than allowing all components to sample from the full `(0.01, 0.99)^d` cube.
 
-- **M-step (component update)**: Update component k using data weighted by `r_ik`:
-  ```
-  loss_k = -sum_i r_ik * log p_k(x_i)  [weighted NLL]
-  pi_k = mean_i(r_ik)  [mixture weight update]
-  ```
-
-**Why it works**:
-- Hard/soft EM forces each component to explain only a subset of data points (those assigned to it)
-- If cluster structure is present, components naturally converge to one cluster per component
-- Once component k covers only cluster k, its forward mapping `f_k: R^d → (0,1)^d` only needs to handle one cluster → the topological mismatch within each component is reduced (single cluster is approximately unimodal, much easier to map from a connected space)
-- With hard assignment: each component sees only in-cluster data → no gradient pressure to put density in inter-cluster regions
-
-**Add-on: Entropy regularization for sharp assignments**:
+**During training**, include the base log-density in the NLL objective:
 ```python
-# Add to training loss to encourage assignment sharpness:
-assignment_entropy = -sum_k r_ik * log(r_ik)  # per sample
-L_total = L_nll - lambda_ent * mean(assignment_entropy)  # minimize entropy = sharpen assignments
+# In MultiBF.train_forward per component k:
+u_k = bf.forward(x)                   # latent code in (0,1)^d
+v_k = logit(u_k)                      # map to logit space (R^d)
+# Gaussian log-prob in logit space (includes change-of-variables Jacobian for sigmoid):
+log_base_k = Normal(μ_k, σ_k).log_prob(v_k).sum(-1)  # (batch_size,)
+# Also include logit Jacobian: -log(u_k) - log(1-u_k) per dimension
+log_base_k = log_base_k - (torch.log(u_k) + torch.log(1 - u_k)).sum(-1)
+
+component_log_probs.append(log_π_k + per_sample_ld + log_base_k)
 ```
 
-**Initialization tip**: Use k-means on the training data to initialize each component's ActiNorm bias to a different cluster center, giving EM a good starting point.
+**Why it works**:
+- If component k specializes to cluster k, `μ_k` converges to the latent code of cluster k's center
+- Points in inter-cluster latent regions have near-zero probability under `Normal(μ_k, σ_k)` →
+  rarely sampled → inter-cluster generation eliminated
+- Even without perfect component specialization, the concentrated sampling reduces inter-cluster
+  sampling probability proportional to `exp(-||v - μ_k||² / 2σ_k²)` — an exponential suppression
+
+**Connection to GMM base literature**:
+This is equivalent to a **learnable GMM prior in the logit-transformed latent space**, which
+becomes a mixture of Beta-like distributions in the bounded `(0,1)^d` space.
 
 **Supporting literature**:
-- **Ng & Zammit-Mangion (2023, arXiv:2301.06404)**: "Mixture Modelling with Normalizing Flows for Spherical Density Estimation" — Uses EM for mixture of normalizing flows, shows EM yields cleaner cluster separation than gradient-based joint training.
-- **arXiv:2602.10602** (Natural Gradient EM for Mixture Density Networks, 2026): Natural gradient EM achieves faster convergence and prevents mode collapse better than standard gradient descent for mixtures.
-- **Xu et al. (2023, ICML)**: MixFlows — mixture-based variational inference showing mixture components specialize with proper objectives.
+- **arXiv:2512.04954** (Amortized Inference of Multi-Modal Posteriors, Dec 2024): *"Standard
+  unimodal base distributions fail to capture disconnected support in multi-modal posteriors,
+  creating spurious probability bridges between modes. Using a GMM matched to the cardinality of
+  target modes significantly improves reconstruction fidelity."* — Direct validation on 2D/3D
+  multi-modal benchmarks.
+- **arXiv:2503.00524** (End-to-End GMM Priors for Diffusion Samplers, Mar 2025): Iterative strategy
+  of adding mixture components during training, addressing mode collapse via structured base.
+- **arXiv:2510.07965** (StiCTAF, Oct 2025 / ICLR 2025): Stick-breaking mixture normalizing flows
+  with component-wise tail adaptation — the closest published architecture to this idea. Shows
+  component-specific base distributions improve mode coverage and anisotropic tail modeling.
+- **arXiv:2409.20547** (Annealing Flow, ICML 2025): Uses structured latent distributions with
+  Wasserstein regularization to align latent components with data modes in CNFs.
 
-**Tradeoffs**:
-- EM requires computing `p_k(x)` for all K components at each step (expensive for large K)
-- Hard EM can cause "dead components" if a component loses all assignments — need component revival strategy
-- Soft EM (keeping some gradient flow) is more numerically stable while still encouraging specialization
-
-**Assessment**: **Second priority**. Addresses the training objective root cause directly. Can be combined with Idea 1 for maximum effect. More complex to implement than Idea 1 but highly principled.
+**Assessment**: Second priority. Small parameter addition (`2Kd` new parameters). Combines
+naturally with Idea 1 — EM assigns data to components, GMM prior constrains latent sampling to
+cluster regions. Together, these two ideas should almost completely eliminate inter-cluster
+generation.
 
 ---
 
-### Idea 3: Neural Spline Flow (Rational-Quadratic Spline) Activation in TreeLayer
+### Idea 3 ★★★★☆: Rational-Quadratic Spline (RQ-NSF) Activation Replacing Sigmoid in TreeLayer
 
-**Target root cause**: Smooth sigmoid activation (Root Cause #3) + indirectly reduces topological mismatch by concentrating density in cluster regions
+**Target root cause**: Sigmoid smoothness (Root Cause #4) + byproduct: eliminates bisection
+**Architectural change**: Medium — replace `Sigmoid` activation in `TreeLayer`
 
-**Core idea**: Replace the `Sigmoid()` activation in `TreeLayer` with a **monotone rational-quadratic spline** (Neural Spline Flow, Durkan et al. 2019). The spline:
-- Has K bins with learnable knot positions (`x_k`, `y_k`) and derivatives at knot points
+**Core idea**: Replace the `Sigmoid()` activation in `TreeLayer.forward_helper` with a **monotone
+rational-quadratic spline** (Neural Spline Flow, Durkan et al. 2019). The spline:
+- Has `B` bins with learnable knot positions `(x_b, y_b)` and derivatives at knot boundaries
 - Each bin is a rational-quadratic polynomial that is monotone increasing
-- **Analytically invertible** → eliminates the need for bisection entirely (sampling becomes O(1) instead of iterative)
-- Can create **near-zero derivative** in "gap" regions between cluster bins → assigns near-zero density to inter-cluster regions
+- **Analytically invertible** — closed-form quadratic solve → eliminates bisection entirely
+- Can assign **near-zero derivative** to inter-cluster "gap" bins → near-zero density between clusters
 
-**Why it works**:
-- Quote from Durkan et al. (2019): *"Monotonic rational-quadratic splines naturally induce multi-modality when used to transform random variables."*
-- With enough bins, the spline can learn to allocate multiple bins to cluster regions and "squeeze" the bins in inter-cluster regions to near-zero width → near-zero density between clusters
-- The analytic inverse (given knot parameters, inversion is a closed-form quadratic solve) replaces bisection, making sampling exact and O(1)
-- Consistently outperforms sigmoid-based flows on standard density estimation benchmarks (POWER, GAS, HEPMASS, BSDS300)
+**Key quote** from Durkan et al. (2019): *"Monotonic rational-quadratic splines naturally induce
+multi-modality when used to transform random variables."*
 
-**Implementation sketch** (in TreeLayer):
+With enough bins, the spline learns to allocate dense bins to cluster regions and compress bins in
+inter-cluster regions to near-zero width → near-zero density between clusters.
+
+**Analytic inversion eliminates bisection**:
+Currently, `inverse_map` runs two-stage bisection (O(log(1/ε)) iterations). With RQ splines, the
+inverse is a closed-form quadratic solve at each dimension — O(1). This reduces sampling cost by
+~50-100× for typical `max_gap=1e-3` settings.
+
+**Implementation sketch** (replacing `Sigmoid` in TreeLayer):
 ```python
-# Replace: self.acti_func = Sigmoid()
-# With: self.acti_func = RationalQuadraticSpline(n_bins=8, range_min=0.0, range_max=1.0)
-
-class RationalQuadraticSpline(nn.Module):
-    def __init__(self, n_bins=8, range_min=0.0, range_max=1.0):
+class RQSpline(nn.Module):
+    """Rational-Quadratic Spline activation (Durkan et al., 2019)."""
+    def __init__(self, n_bins=8, bound=5.0):
+        super().__init__()
         self.n_bins = n_bins
-        # widths, heights, derivatives are predicted by the conditioner network
-        # or learned as parameters in the tree layer
-    
-    def forward(self, x, widths, heights, derivatives):
-        # Compute rational-quadratic spline transformation
-        # Returns y = spline(x), analytically invertible
-        ...
-    
-    def inverse(self, y, widths, heights, derivatives):
-        # Closed-form quadratic formula for the inverse
+        self.bound = bound
+
+    def forward(self, x, widths_logits, heights_logits, derivatives_log):
+        # widths, heights: softmax-normalized bin widths/heights in [-bound, bound]
+        # derivatives: softplus-transformed positive derivatives at knots
+        widths      = F.softmax(widths_logits, dim=-1) * 2 * self.bound
+        heights     = F.softmax(heights_logits, dim=-1) * 2 * self.bound
+        derivatives = F.softplus(derivatives_log) + 1e-5
+        return rational_quadratic_spline(x, widths, heights, derivatives)
+
+    def inverse(self, y, widths_logits, heights_logits, derivatives_log):
+        # Closed-form quadratic formula — no bisection needed
         ...
 ```
 
-The spline parameters (widths, heights, derivatives at knots) can be predicted by the TreeLayer's conditioner network, or learned as static parameters per layer. Both approaches are valid.
-
-**Bonus: Eliminates bisection cost**:
-With analytic inversion, MultiBF.inverse_map no longer needs the two-stage bisection algorithm. Sampling becomes a single forward pass through the inverse spline, reducing sampling time significantly and eliminating the bisection approximation error.
+The spline parameters (`widths_logits`, `heights_logits`, `derivatives_log`) per dimension can be
+predicted by the existing TreeLayer's breeze connections (conditioner), making this a natural drop-in
+replacement that uses existing architectural infrastructure.
 
 **Supporting literature**:
-- **Durkan et al. (2019), "Neural Spline Flows", NeurIPS 2019 (arXiv:1906.04032)**: Introduces rational-quadratic splines as monotone flow transformations. State-of-the-art on all standard benchmarks at publication. "Naturally induces multi-modality."
-- **arXiv:2601.10774** (Analytic Bijections for Smooth Normalizing Flows, Jan 2026): Proposes cubic rational, sinh, and cubic polynomial bijections with analytic inverses. Explicitly shows these outperform sigmoid-based flows on radially-structured multi-cluster targets ("radial flows achieve comparable quality with 1000x fewer parameters on radially-structured targets").
-- **Existing BreezeForest notes** (`notes/papers/search_2026_02_10_monotone_universal_density.md`): Analytic bijections could "replace BreezeForest's sigmoid activation, eliminating the need for bisection entirely."
+- **arXiv:1906.04032** (Neural Spline Flows, NeurIPS 2019): Original RQ-NSF paper. State-of-the-art
+  on POWER, GAS, HEPMASS, MINIBOONE, BSDS300 benchmarks. Outperforms sigmoid/tanh-based flows.
+  "Naturally induces multi-modality."
+- **arXiv:2508.17056** (TabResFlow, Aug 2025): RQ-NSF-based probabilistic regression achieves
+  **9.64% improvement in likelihood** over TreeFlow and **5.6× inference speedup** vs NodeFlow on
+  9 tabular benchmarks. Confirms RQ-NSF advantage on structured multi-modal regression tasks.
+- **arXiv:2601.10774** (Analytic Bijections for Smooth NFs, Jan 2026): Systematic study of analytic
+  bijections (cubic rational, sinh, cubic polynomial) for flow transformations. Shows analytic
+  invertibility enables one-pass sampling (no bisection) with competitive quality.
+- **arXiv:2302.12024** (Augmented RQ Spline Flows): Extended spline flows on 400-dimensional
+  multimodal targets; best results among monotone flow architectures at that scale.
 
-**Assessment**: **Third priority**. Addresses the expressiveness root cause and provides a bonus of eliminating bisection. Most significant code change of the three ideas (modifying TreeLayer activation), but well-supported by literature and the improvement in expressiveness is well-established.
+**Assessment**: Third priority. More significant code change than Ideas 1 & 2, but well-supported
+by the literature and provides a double benefit: better multi-cluster expressiveness + faster
+sampling. Recommended after Ideas 1 & 2 are validated.
+
+---
+
+### Bonus Idea: Temperature Annealing During MultiBF Training
+
+**Target root cause**: Component specialization failure (Root Cause #1, complementary to Idea 1)
+**Architectural change**: Zero — one-line hyperparameter change
+
+**Core idea**: Multiply the log-likelihood by a temperature schedule `1/T(t)` during training, where
+`T` starts large (≈5-10) and anneals to 1. High temperature flattens the loss landscape, allowing
+components to initially explore widely without prematurely committing to one mode. As temperature
+decreases, components sharpen their specialization.
+
+```python
+# In demo_multi_bf.py training loop:
+T = max(1.0, T_init * (decay_rate ** iteration))
+loss = -log_prob / T   # temperature-scaled loss
+```
+
+**arXiv:2602.12923** (Feb 2026) proves theoretically that "an appropriately chosen annealing scheme
+can robustly prevent mode collapse" in Gaussian mixture variational inference, and provides a sharp
+formula for the optimal annealing schedule. The paper validates this on RealNVP normalizing flows.
+
+This is the cheapest possible intervention — no code change in the model, just modify the training
+loop to scale the loss by temperature. Best used as a **first-line intervention** combined with a
+good initialization (k-means) before implementing Idea 1 or 2.
 
 ---
 
 ## Summary Table
 
-| Idea | Root Cause Addressed | Expected Impact | Implementation Complexity | Key Paper |
+| Idea | Root Cause | Impact | Code Change | Key Paper (Year) |
 |---|---|---|---|---|
-| **1. GMM-Aligned Base per Component** | Topological mismatch + Component non-exclusivity | HIGH | Low-Medium (add params + prior term) | arXiv:2512.04954 (2024) |
-| **2. EM Hard Assignment Training** | Component non-exclusivity | HIGH | Medium (modify training loop) | arXiv:2301.06404 (2023) |
-| **3. Neural Spline Flow Activation** | Smooth activation / expressiveness | MEDIUM-HIGH | Medium-High (modify TreeLayer) | arXiv:1906.04032 (2019) |
+| **1. nGEM Responsibility-Weighted Training** | Component non-specialization | ★★★★★ | Training loop only | arXiv:2602.10602 (Feb 2026) |
+| **2. Per-Component GMM Base Distribution** | Topology + flat base | ★★★★☆ | +2Kd params in MultiBF | arXiv:2512.04954 (Dec 2024) |
+| **3. RQ Spline Activation in TreeLayer** | Sigmoid smoothness | ★★★★☆ | Replace Sigmoid class | arXiv:1906.04032 (NeurIPS 2019) |
+| **Bonus: Temperature Annealing** | Component specialization | ★★★☆☆ | 1-line LR/loss change | arXiv:2602.12923 (Feb 2026) |
 
-## Recommended Priority Order
-1. **Idea 1 first**: Lowest implementation cost, directly fixes topological root cause. Add learnable `(mu_k, log_sigma_k)` to MultiBF — only ~2*K*d new parameters. Test on 8 Gaussians.
-2. **Idea 2 second**: Combine with Idea 1 for synergy. EM-style training + GMM prior together almost guarantee component specialization.
-3. **Idea 3 third**: Replace sigmoid with splines for the final expressiveness upgrade + bisection elimination.
+## Recommended Implementation Order
+
+1. **First**: Bonus annealing + k-means init — zero code change, validates whether specialization
+   can be encouraged cheaply
+2. **Second**: Idea 1 (nGEM training) — no architecture change, directly fixes root cause #1
+3. **Third**: Idea 2 (per-component base) — pairs with Idea 1 for complete coverage of root causes
+   #2 and #3
+4. **Fourth**: Idea 3 (RQ spline) — upgrades expressiveness and eliminates bisection overhead
+
+Each idea is **independently applicable** and their benefits are **additive** when combined.
 
 ## Related Notes
-- `/workspace/notes/comparisons/bf_vs_bnaf_2026_02_10.md` — BreezeForest vs BNAF (background context)
-- `/workspace/notes/papers/search_2026_02_10_monotone_universal_density.md` — Paper searches
-- `/workspace/notes/reviews/autoregressive_normalizing_flows_2026_02_10.md` — Literature review
+- `/workspace/notes/comparisons/bf_vs_bnaf_2026_02_10.md`
+- `/workspace/notes/papers/search_2026_02_10_monotone_universal_density.md`
+- `/workspace/notes/reviews/autoregressive_normalizing_flows_2026_02_10.md`
